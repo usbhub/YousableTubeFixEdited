@@ -50,21 +50,21 @@ var YT_PLAYER_EXPANDED_SIZE = {width: 854, height: 510};
 var YT_PLAYER_CONTROLBAR_HEIGHT = 35;
 
 // Id of the player's div node (player's parent node) in YouTube watch page
-var YT_PLAYER_DIV_ID = "watch7-player";
+var YT_PLAYER_DIV_ID = "player-api";
 
 // Class of the player's div node (player's parent node) in the HTML5 YouTube watch page
 var YT_PLAYER_DIV_CLASS_HTML5 = "html5-player";
 
 // Id of the video div node (player's div's parent node) in YouTube watch page
-var YT_VIDEO_DIV_ID = "watch7-video";
+//var YT_VIDEO_DIV_ID = "player";
 
 // Id and left padding (in pixels) of the video container div node (video div's parent node) in YouTube watch page
-var YT_VIDEO_CONTAINER_DIV_ID = "watch7-video-container";
+var YT_VIDEO_CONTAINER_DIV_ID = "player";
 var YT_VIDEO_CONTAINER_DIV_LPADDING = 225;
 
 // Class of the player's root node (the player is inserted as a child of this node) and ids of the player node (Flash and HTML5) in YouTube channel pages
 var YT_PLAYER_ROOT_CHANNEL_CLASS = "channels-video-player";
-var YT_PLAYER_CHANNEL_ID_FLASH = "movie_player-flash";
+var YT_PLAYER_CHANNEL_ID_FLASH = "movie_player";
 var YT_PLAYER_CHANNEL_ID_HTML5 = "movie_player-html5";
 
 // Id of YouTube watch pages playlist and class of the playlist bar (playlist's child node)
@@ -674,7 +674,14 @@ function VideoAdapter(playerId, cbAPIFunc, defaultVideoName, defaultVideoUsernam
 
 		//'
 		that._apiReadyActions.forEach(function(aFunc) {
-			if (typeof aFunc === "function") aFunc();
+			try{
+				//console.log("IN api loop, func: " + aFunc);
+				if (typeof aFunc === "function") aFunc();
+			}
+			catch(e){
+				console.log("IN videoAdapterAPI apiReadyActions.forEach An error has occurred: " + e.message);
+				//alert("IN An error has occurred: " + e.message);
+			}
 		});
 
 		// If the API callback function isn't null, it is called
@@ -1047,6 +1054,7 @@ VideoAdapter.getVideoTitledDownloadURL = function(vFormatObj, vId, vTitle, vUser
 };
 // Getter to the unwrapped version of the player if it's available (or the player itself if not)
 VideoAdapter.prototype.__defineGetter__("uwPlayer", function() {
+	//console.log("IN __defineGetter__ uwPlayer, this.player.wrappedJSObject:" + this.player.wrappedJSObject + " player:" + this.player);
 	return (this.player.wrappedJSObject) ? this.player.wrappedJSObject : this.player;
 });
 // Getter that determines if the YouTube's API is ready
@@ -1096,7 +1104,8 @@ VideoAdapter.prototype.parseURLMap = function() {
 VideoAdapter.prototype.expandPlayer = function() {
 	try {
 		setYTSessionCookie("wide", "1"); // Sets the "wide" cookie to make the video expand automatically in the current session
-		unsafeWindow.yt.pubsub.publish("player-resize", true);
+		if (typeof(unsafeWindow.yt.pubsub.publish) == "function")
+			unsafeWindow.yt.pubsub.publish("player-resize", true);
 	}
 	catch(err) {
 		console.log("[VideoAdapter.expandPlayer]: Error trying to expand the video: " + err.toString());
@@ -1372,6 +1381,10 @@ var resizeNamedSizes = new AsocArray(//'
 //////////////////////// END OF CLASSES AND SINGLETONS ////////////////////////
 
 ///////////////////////////// START OF CSS STYLES /////////////////////////////
+
+// Centering css derived (but heavily edited) from YouTube ReCentered on userstyles, credit to that author
+var centeringCss = "#alerts,\n#baseDiv,\n#header #ad_creative_1,\n#footer,\n#masthead-subnav ul,\n#masthead-expanded-container #masthead-expanded-lists-container,\n#header #masthead-subnav,\n#page-container #page,\n#page.channel,\n#page.feed,\n#page.guide-builder-v2,\n#page.home,\n#page.page-default,\n#page.subscription-manager,\n#player-api,\n#ticker .ytg-wide,\n#watch7-main-container #watch7-main,\n#watch7-playlist-data .watch7-playlist-bar,\n#yt-admin,\n#yt-masthead-container #yt-masthead {\n	margin: 0 auto !important;\n}\n\n#page #content {\n	max-width: 100% !important;\n}\n\n#page.search,\n#yt-admin,\n#yt-masthead-container #yt-masthead {\n	max-width: 100% !important;\n	min-width: 1003px !important;\n	width: 1003px !important;\n}\n\n#footer-container #footer {\n	width: 710px !important;\n	margin: 0 auto !important;\n}\n\n#watch7-container #watch7-main-container, #watch7-container #player {\n	padding-left: 0;\n}\n\n#watch7-main {\n	width: 1040px !important;\n}\n\n#watch7-playlist-data {\n	width: 100%;\n	padding: 0;\n}";
+GM_addStyle(centeringCss);
 
 // Adds the CSS styles for the script to the page, making them important
 GM_addStyle([
@@ -2211,12 +2224,17 @@ function scriptWatchMain() {
 		if (watchVA.VAType === "Flash") {
 
 			// Sets a listener to resize the video to the default size if the shrink/expand button of the player is pressed (to restore YouTube's original layout)
-			var restoreSizeFuncName = getUniqueFunctionName("ytfrestoreSize");
-			unsafeWindow[restoreSizeFuncName] = function(isWide) {
-				resizePlayer("default", false); // The page shouldn't be scrolled
+			try {
+				var restoreSizeFuncName = getUniqueFunctionName("ytfrestoreSize");
+				unsafeWindow[restoreSizeFuncName] = function(isWide) {
+					resizePlayer("default", false); // The page shouldn't be scrolled
+				}
+				watchVA.uwPlayer.addEventListener("SIZE_CLICKED", restoreSizeFuncName);
 			}
-			watchVA.uwPlayer.addEventListener("SIZE_CLICKED", restoreSizeFuncName);
-
+			catch(e){
+				console.log("IN scriptWatchAPI RESIZE An error has occurred: " + e.message);
+				//alert("IN scriptWatchAPI RESIZE An error has occurred: " + e.message);
+			}
 			// Resizes the player to the chosen video size and scrolls to it (if configured to do so)
 			resizePlayer(scriptConfig.videoSize, scriptConfig.scrollToVideo);
 
@@ -2232,8 +2250,9 @@ function scriptWatchMain() {
 		var meSt = arguments.callee;
 
 		// Gets the player div, the video div (the player div parent) and the video container div (the video div parent)
-		var playerDiv = $(YT_PLAYER_DIV_ID), videoDiv = $(YT_VIDEO_DIV_ID), videoContainerDiv = $(YT_VIDEO_CONTAINER_DIV_ID);
-		if ((!playerDiv) || (!videoDiv) || (!videoContainerDiv)) return;
+		var playerDiv = $(YT_PLAYER_DIV_ID), videoContainerDiv = $(YT_VIDEO_CONTAINER_DIV_ID);
+		//console.log("IN resizePlayer " + sizeValue + " " + playerDiv + " " + videoContainerDiv);
+		if ((!playerDiv) || (!videoContainerDiv)) return;
 
 		// Gets the playlist and its bar (if they exists in the page)
 		var playlistDiv = $(YT_PLAYLIST_ID);
@@ -2250,6 +2269,11 @@ function scriptWatchMain() {
 
 		// If the passed video size is "default", the function returns after reverting all changes done in previous calls and restoring the player to its default YouTube size
 		// The page is also scrolled to the player div (or the playlist bar if it exists) if configured to do so and the resize button is updated
+		var guide = document.getElementById("guide-container");
+		var belowContainer = document.getElementById("watch7-main-container");
+		var belowVid = document.getElementById("watch7-main");
+		//var belowVidComments = document.getElementById("watch7-content");
+		//var belowVidSidebar = document.getElementById("watch7-sidebar");
 		if (sizeValue === "default") {
 			if (playlistBar) {
 				playlistBar.style.width = "";
@@ -2257,8 +2281,9 @@ function scriptWatchMain() {
 			}
 			playerDiv.style.width = "";
 			playerDiv.style.height = "";
-			videoContainerDiv.style.paddingLeft = "";
-			videoDiv.style.width = "";
+			guide.style.top = "";
+			guide.style.left = "";
+			belowContainer.style.paddingLeft = "";
 			if (doScroll) scrollToNode((playlistBar) ? playlistBar : playerDiv);
 			updateResizeButtonContent();
 			return;
@@ -2284,9 +2309,77 @@ function scriptWatchMain() {
 								 height: YT_PLAYER_EXPANDED_SIZE.height * sizeValueFloat};
 		}
 
-		// The new player size is applied to the player div style (the player will resize too because of its "100%" height and width defined in YouTube's CSS)
-		videoDiv.style.width = "100%"; // Overrides the fixed YT_COLUMN_WIDTH width of the video div in YouTube's CSS to allow the player div to expand beyond that
-		videoContainerDiv.style.paddingLeft = Math.clamp((YT_COLUMN_WIDTH - newSize.width) / 2 + YT_VIDEO_CONTAINER_DIV_LPADDING, 0, YT_VIDEO_CONTAINER_DIV_LPADDING + YT_COLUMN_WIDTH).toCSS(); // Modifies the original YT_VIDEO_CONTAINER_DIV_LPADDING left padding of the video container div in YouTube's CSS to center the resized player
+		var videoLeft = Math.max((viewportSize.width - newSize.width) / 2, 0);
+		//videoContainerDiv.style.paddingLeft = videoLeft.toCSS();
+
+		var guideWidth = guide.clientWidth;
+		var guideLeft;
+		var guideBesideWidth;
+		var belowVidWidth = belowVid.clientWidth;
+		// Below determines whether there is enough room beside the video for the guide
+		// if not move it down beside the comments
+		if (videoLeft < guideWidth) {
+			// Not enough space beside video for guide, move it down
+			guide.style.top = (newSize.height + 30).toCSS();
+			guideBesideWidth = belowVidWidth;
+		}
+		else {
+			// Enough space beside video for guide
+			guide.style.top = "";
+			// If the guide is beside the video, you have to ensure that when it is expanded
+			// it doesnt overlap with comments section, so this makes sure its left offset is
+			// determined by the larger of the video or comments width, that way with smaller
+			// videos (0.75x etc..) the guide will not collide with the comments
+			guideBesideWidth = Math.max(newSize.width, belowVidWidth);
+		}
+
+		//console.log(viewportSize.width + " " + guideBesideWidth + " " + guideWidth)
+		// Determines the left offset of the guide
+		guideLeft = (viewportSize.width - guideBesideWidth) / 2 - guideWidth;
+		var minBelowContainerPadding = 0;
+		if (guideLeft < 0) {
+			// If there is not enough space for the guide with the below container / comments being
+			// centered, then we have to set a padding for the comments which will throw off the centering a bit
+
+			// Note the -2, thats because the comments are centered via margin: auto, so for every 10px padding
+			// the comments only actually move over 5 px, until it is equal to the container width
+			minBelowContainerPadding = Math.min(guideLeft * -2, guideWidth);
+			guideLeft = 0;
+		}
+		//console.log(guideLeft);
+
+		// Dont need the below commented lines, kept in case one would like to remove the css margin centering
+		// and instead use javascript centering, then it could be used
+		//var belowContainerCenterPadding = (viewportSize.width - belowVidWidth) / 2;
+		//belowVid.style.setProperty("margin-left", "0", "important");
+		//minBelowContainerPadding = Math.max(guideLeft + guide.clientWidth, belowContainerCenterPadding);
+		belowContainer.style.paddingLeft = minBelowContainerPadding.toCSS();
+		guide.style.left = guideLeft.toCSS();
+
+		// I have to expand the guide like this because YouTube does some stupid
+		// setup that takes like 2 seconds before the guide is ready to be expanded
+		// It gives up after 10 times (~10sec) in case there is a failure somewhere
+		var self = resizePlayer;
+		var guideToggleButton = document.body.querySelector(".guide-module-toggle");
+		var expandGuide = function () {
+			if (typeof(self.guideExpandTrys) == "undefined")
+				self.guideExpandTrys = 1;
+			if (self.guideExpandTrys++ > 10)
+				return;
+			guideToggleButton.click();
+			if ((document.body.className).indexOf("guide-expanded") == -1) {
+				setTimeout(expandGuide, 1000);
+			}
+		};
+
+		// Instead of expanding the guide like this it should probably be put in
+		// an initialization function, but I wanted to keep my changes as localized as
+		// possible
+		if (typeof(self.firstRun) == "undefined") {
+			self.firstRun = true;
+			expandGuide();
+		}
+
 		playerDiv.style.width = newSize.width.toCSS();
 		playerDiv.style.height = newSize.height.toCSS();
 		if (playlistBar) { // If the playlist exists it is resized too to match the player
